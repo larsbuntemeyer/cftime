@@ -5,6 +5,7 @@ Performs conversions of netCDF time coordinate data to/from datetime objects.
 from cpython.object cimport (PyObject_RichCompare, Py_LT, Py_LE, Py_EQ,
                              Py_NE, Py_GT, Py_GE)
 from numpy cimport int64_t, int32_t
+from numpy import timedelta64
 import cython
 import numpy as np
 import re
@@ -1528,16 +1529,16 @@ The default format of the string produced by strftime is controlled by self.form
     def __add__(self, other):
         cdef datetime dt
         cdef bint has_year_zero
-        if isinstance(self, datetime) and isinstance(other, timedelta):
+        if isinstance(self, datetime) and isinstance(other, (timedelta, timedelta64)):
             dt = self
             calendar = self.calendar
             has_year_zero = self.has_year_zero
-            delta = other
-        elif isinstance(self, timedelta) and isinstance(other, datetime):
+            delta = other.item() if isinstance(other, timedelta64) else other
+        elif isinstance(self, (timedelta, timedelta64)) and isinstance(other, datetime):
             dt = other
             calendar = other.calendar
             has_year_zero = other.has_year_zero
-            delta = self
+            delta = other.item() if isinstance(other, timedelta64) else other
         else:
             return NotImplemented
         # return calendar-specific subclasses for backward compatibility,
@@ -1594,32 +1595,33 @@ datetime instance.  Try using only_use_cftime_datetimes=True when creating the
 datetime object."""
                     raise TypeError(msg)
                 return dt._to_real_datetime() - other
-            elif isinstance(other, timedelta):
+            elif isinstance(other, (timedelta, timedelta64)):
                 # datetime - timedelta
                 # return calendar-specific subclasses for backward compatibility,
                 # even though after 1.3.0 this is no longer necessary.
+                delta = other.item() if isinstance(other, timedelta64) else other
                 has_year_zero=self.has_year_zero
                 if self.calendar == '360_day':
                     #return self.__class__(*add_timedelta_360_day(self, -other),calendar=self.calendar)
-                    return Datetime360Day(*add_timedelta_360_day(self, -other))
+                    return Datetime360Day(*add_timedelta_360_day(self, -delta))
                 elif self.calendar == 'noleap':
                     #return self.__class__(*add_timedelta(self, -other, no_leap, False, True),calendar=self.calendar)
-                    return DatetimeNoLeap(*add_timedelta(self, -other, no_leap, False, True))
+                    return DatetimeNoLeap(*add_timedelta(self, -delta, no_leap, False, True))
                 elif self.calendar == 'all_leap':
                     #return self.__class__(*add_timedelta(self, -other, all_leap, False, True),calendar=self.calendar)
-                    return DatetimeAllLeap(*add_timedelta(self, -other, all_leap, False, True))
+                    return DatetimeAllLeap(*add_timedelta(self, -delta, all_leap, False, True))
                 elif self.calendar == 'julian':
                     #return self.__class__(*add_timedelta(self, -other, 
                     #     is_leap_julian, False, has_year_zero),calendar=self.calendar,has_year_zero=self.has_year_zero)
-                    return DatetimeJulian(*add_timedelta(self, -other, is_leap_julian, False, has_year_zero),has_year_zero=self.has_year_zero)
+                    return DatetimeJulian(*add_timedelta(self, -delta, is_leap_julian, False, has_year_zero),has_year_zero=self.has_year_zero)
                 elif self.calendar == 'standard':
                     #return self.__class__(*add_timedelta(self, -other, 
                     #     is_leap_gregorian, True, has_year_zero),calendar=self.calendar,has_year_zero=self.has_year_zero)
-                    return DatetimeGregorian(*add_timedelta(self, -other, is_leap_gregorian, True, has_year_zero),has_year_zero=self.has_year_zero)
+                    return DatetimeGregorian(*add_timedelta(self, -delta, is_leap_gregorian, True, has_year_zero),has_year_zero=self.has_year_zero)
                 elif self.calendar == 'proleptic_gregorian':
                     #return self.__class__(*add_timedelta(self, -other,
                     #    is_leap_proleptic_gregorian, False, has_year_zero),calendar=self.calendar,has_year_zero=self.has_year_zero)
-                    return DatetimeProlepticGregorian(*add_timedelta(self, -other, is_leap_proleptic_gregorian, False, has_year_zero),has_year_zero=self.has_year_zero)
+                    return DatetimeProlepticGregorian(*add_timedelta(self, -delta, is_leap_proleptic_gregorian, False, has_year_zero),has_year_zero=self.has_year_zero)
                 else:
                     return NotImplemented
             else:
