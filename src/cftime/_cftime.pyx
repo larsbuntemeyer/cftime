@@ -1538,7 +1538,7 @@ The default format of the string produced by strftime is controlled by self.form
             dt = other
             calendar = other.calendar
             has_year_zero = other.has_year_zero
-            delta = other.item() if isinstance(other, timedelta64) else other
+            delta = self.item() if isinstance(self, timedelta64) else self
         else:
             return NotImplemented
         # return calendar-specific subclasses for backward compatibility,
